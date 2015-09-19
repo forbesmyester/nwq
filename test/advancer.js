@@ -47,12 +47,11 @@ describe('advancer', function() {
             expect(resp.toQueue).to.equal('do-google-search/err');
             memoryExchange.getMessage('do-google-search/err', function(err2, body) {
                 expect(err2).to.equal(null);
-                expect(body).to.eql({
-                    err: 500,
-                    path: ["validate-msg:success", "construct-url:find-alternative", "do-google-search:err"],
-                    body: undefined,
-                    previousBody: {name: "http://www.google.com?q=Teapot"}
-                });
+                expect(body.err).to.eql(500);
+                expect(body.path).to.eql(["validate-msg:success", "construct-url:find-alternative", "do-google-search:err"]);
+                expect(body.body).to.equal(undefined);
+                expect(body.previousBody).to.eql({name: "http://www.google.com?q=Teapot"});
+                expect(body).to.haveOwnProperty('id');
                 done();
             });
         }
