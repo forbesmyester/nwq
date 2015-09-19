@@ -2,9 +2,13 @@
 
 import {expect} from "chai";
 import MemoryExchange from "../lib/MemoryExchange";
+import SQSExchange from "../lib/SQSExchange";
 import advancer from "../lib/advancer";
+import AWS from "aws-sdk";
 
 describe('advancer', function() {
+
+    this.timeout(20000);
 
     function validateMessage(messageBody, next) {
         if (
@@ -23,24 +27,34 @@ describe('advancer', function() {
 
     it('can run a queue', function(done) {
 
-        const memoryExchange = new MemoryExchange();
+        var Q = {
+            getSQS: function() {
+                let sqs = new AWS.SQS({region: "eu-west-1"});
+                return new SQSExchange(sqs);
+            },
+            getMemory: function() {
+                return new MemoryExchange();
+            }
+        };
 
-        function checkIt(err, { fromQueue, toQueue }) {
+        // You can swap this to SQS to test that too!
+        // const memoryExchange = Q.getSQS();
+        const memoryExchange = Q.getMemory();
+
+        function checkIt(err, resp) {
             expect(err).to.equal(null);
-            expect(fromQueue).to.equal('do-google-search');
-            expect(toQueue).to.equal('do-google-search/err');
-            expect(memoryExchange._dump()).to.eql({
-                "validate-msg": [],
-                "construct-url": [],
-                "do-google-search": [],
-                "do-google-search/err": [{
+            expect(resp.fromQueue).to.equal('do-google-search');
+            expect(resp.toQueue).to.equal('do-google-search/err');
+            memoryExchange.getMessage('do-google-search/err', function(err2, body) {
+                expect(err2).to.equal(null);
+                expect(body).to.eql({
                     err: 500,
                     path: ["validate-msg:success", "construct-url:find-alternative", "do-google-search:err"],
                     body: undefined,
                     previousBody: {name: "http://www.google.com?q=Teapot"}
-                }]
+                });
+                done();
             });
-            done();
         }
 
         var serviceDesc = {
@@ -63,10 +77,10 @@ describe('advancer', function() {
             serviceDesc['validate-msg'].resolutions,
             memoryExchange,
             serviceDesc['validate-msg'].handler,
-            function(err, { fromQueue, toQueue }) {
+            function(err, details) {
                 expect(err).to.equal(null);
-                expect(fromQueue).to.equal('validate-msg');
-                expect(toQueue).to.equal('construct-url');
+                expect(details.fromQueue).to.equal('validate-msg');
+                expect(details.toQueue).to.equal('construct-url');
             }
         );
 
@@ -89,7 +103,6 @@ describe('advancer', function() {
             serviceDesc['do-google-search'].handler,
             checkIt
         );
-
 
         memoryExchange.postMessageBody('validate-msg', {name: "Bob"});
 
