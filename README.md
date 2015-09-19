@@ -1,5 +1,9 @@
 # a New method for Working with Queues
 
+## Installation
+
+    npm install nwq
+
 ## The Situation
 I have a pipeline, it's not currently very complicated but it is:
 
@@ -24,3 +28,5 @@ My aims where as follows:
  * Get a log for the path that every message went through the pipeline.
  * If errors occur it should exit pipeline and do sufficient logging of the error.
  * Write little or no logging code for either path through the pipeline or error tracking.
+
+

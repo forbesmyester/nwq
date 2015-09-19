@@ -1,12 +1,13 @@
 {
   "name": "nwq",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Base Node ES6 Project",
   "scripts": {
     "test": "node_modules/.bin/eslint test/*.js lib/*.js && mocha --compilers js:babel/register",
     "pretest": "echo '#!/bin/bash\nnpm test' >  .git/hooks/pre-commit && chmod +x  .git/hooks/pre-commit",
-    "prepublish": "node_modules/.bin/browserify lib/advancer.js -t babelify > js/advancer.js && node_modules/.bin/browserify lib/MemoryExchange.js -t babelify > js/MemoryExchange.js"
+    "prepublish": "node_modules/.bin/browserify lib/advancer.js -t babelify > advancer.js && node_modules/.bin/browserify lib/SQSExchange.js -t babelify > SQSExchange.js && node_modules/.bin/browserify lib/MemoryExchange.js -t babelify > MemoryExchange.js"
   },
+  "files": [ "advancer.js", "MemoryExchange.js", "SQSExchange.js" ],
   "repository": {
     "type": "git",
     "url": "https://github.com/forbesmyester/nwq.git"
