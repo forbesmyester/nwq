@@ -128,4 +128,33 @@ describe('advancer', function() {
         memoryExchange.postMessageBody('validate-msg', {});
     });
 
+    it('has a forever function which will run n versions of a function, always', function(done) {
+
+        var c = 0,
+            results = [];
+
+        function doForever(next) {
+            setTimeout(function() {
+                if (c >= 5) {
+                    next(new Error(">5"));
+                }
+                next(null, ++c);
+            }, 5);
+        }
+
+        advancer._forever(
+            doForever,
+            10,
+            function(result) {
+                results.push(result);
+            },
+            function(err) {
+                expect(err.message).to.equal(">5");
+                expect(results).to.eql([1, 2, 3, 4, 5]);
+                done();
+            }
+        );
+    });
+
+
 });
