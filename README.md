@@ -29,4 +29,6 @@ My aims where as follows:
  * If errors occur it should exit pipeline and do sufficient logging of the error.
  * Write little or no logging code for either path through the pipeline or error tracking.
 
+## TODO:
 
+ * Add a manager of some variety to keep processing messages instead of stopping after one.

@@ -11,9 +11,10 @@ describe('advancer', function() {
     this.timeout(20000);
 
     function validateMessage(messageBody, next) {
-        if (
-            !messageBody.hasOwnProperty('name') || messageBody.name.length < 5
-        ) { return next(null, {name: "Teapot"}); }
+        if (!messageBody.hasOwnProperty('name')) { return next(null, "done", {}); }
+        if (messageBody.name.length < 5) {
+            return next(null, {name: "Teapot"});
+        }
         next(null, {name: messageBody.name});
     }
 
@@ -25,21 +26,21 @@ describe('advancer', function() {
         next(500);
     }
 
+    var Queue = {
+        getSQS: function() {
+            let sqs = new AWS.SQS({region: "eu-west-1"});
+            return new SQSExchange(sqs);
+        },
+        getMemory: function() {
+            return new MemoryExchange();
+        }
+    };
+
     it('can run a queue', function(done) {
 
-        var Q = {
-            getSQS: function() {
-                let sqs = new AWS.SQS({region: "eu-west-1"});
-                return new SQSExchange(sqs);
-            },
-            getMemory: function() {
-                return new MemoryExchange();
-            }
-        };
-
         // You can swap this to SQS to test that too!
-        // const memoryExchange = Q.getSQS();
-        const memoryExchange = Q.getMemory();
+        // const memoryExchange = Queue.getSQS();
+        const memoryExchange = Queue.getMemory();
 
         function checkIt(err, resp) {
             expect(err).to.equal(null);
@@ -105,6 +106,26 @@ describe('advancer', function() {
 
         memoryExchange.postMessageBody('validate-msg', {name: "Bob"});
 
+    });
+
+    it('will advance to nowhere if it advances to `null`', function(done) {
+
+        const memoryExchange = Queue.getMemory();
+
+        advancer(
+            'validate-msg',
+            { "success": "construct-url", "done": null },
+            memoryExchange,
+            validateMessage,
+            function(err, details) {
+                expect(err).to.equal(null);
+                expect(details.fromQueue).to.equal('validate-msg');
+                expect(details.toQueue).to.equal(null);
+                done();
+            }
+        );
+
+        memoryExchange.postMessageBody('validate-msg', {});
     });
 
 });
