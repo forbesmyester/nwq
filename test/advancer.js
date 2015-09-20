@@ -130,6 +130,13 @@ describe('advancer', function() {
 
     it('has a forever function which will run n versions of a function, always', function(done) {
 
+        // This needs better tests
+        //
+        //  * How do we know they are concurrent?
+        //  * We know `done()` is not called multiple times, but does it actually stop?
+        //
+        // Maybe startup notification may address these issues? Will need to think a bit more.
+
         var c = 0,
             results = [];
 
@@ -156,5 +163,32 @@ describe('advancer', function() {
         );
     });
 
+    it('will continue to advance if advancer.forever() is used', function(done) {
+
+        const memoryExchange = Queue.getMemory();
+        var callCount = 0;
+
+        advancer.forever(
+            5,
+            'validate-msg',
+            { "success": "construct-url", "done": null },
+            memoryExchange,
+            validateMessage,
+            function(result) {
+                expect(result.fromQueue).to.equal('validate-msg');
+                expect(result.toQueue).to.equal(null);
+                if (++callCount >= 3) {
+                    done();
+                }
+            },
+            function() {
+                expect.fail();
+            }
+        );
+
+        memoryExchange.postMessageBody('validate-msg', {});
+        memoryExchange.postMessageBody('validate-msg', {});
+        memoryExchange.postMessageBody('validate-msg', {});
+    });
 
 });
