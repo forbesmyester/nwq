@@ -32,3 +32,4 @@ My aims where as follows:
 ## TODO
 
  * Add more tests around _forever, see note in unit tests
+ * Does `advancer._forever()` exist as an infinite loop... probably.
