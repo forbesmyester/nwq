@@ -40,7 +40,7 @@ Register a function to move messages from somewhere, to somewhere else:
 
     advancer(
         // Where messages are picked up from
-        'message-into-validation', 
+        'validate-input',
 
         // Where messages go after processing
         { "too-short": "log-bad-message", "success": "store-in-db" } 
@@ -49,7 +49,7 @@ Register a function to move messages from somewhere, to somewhere else:
         memoryExchange,
 
         // The validation function itself
-        function validateMessage(messageBody, next) {
+        function validateInput(messageBody, next) {
             if (!messageBody.hasOwnProperty('name')) { return next(null, "done", {}); }
             if (messageBody.name.length < 5) {
                 return next(null, {name: "Teapot"});
@@ -72,7 +72,7 @@ Register a function to move messages from somewhere, to somewhere else:
 
 Give the Queue some data:
 
-    memoryExchange.postMessageBody('validate-msg', {name: "Bob"});
+    memoryExchange.postMessageBody('validate-input', {name: "Bob"});
 
 It will probably be that you want to continually take messages from a queue, in which case see `advancer.forever()`.
 
