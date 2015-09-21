@@ -52,9 +52,9 @@ Register a function to move messages from somewhere, to somewhere else:
         function validateInput(messageBody, next) {
             if (!messageBody.hasOwnProperty('name')) { return next(null, "done", {}); }
             if (messageBody.name.length < 5) {
-                return next(null, {name: "Teapot"});
+                return next(null, "log-bad-message", messageBody);
             }
-            next(null, {name: messageBody.name});
+            next(null, {name: messageBody.name}); // two parameters implies success
         }
 
         // After the message has been processed, this function will be called
