@@ -29,7 +29,53 @@ My aims where as follows:
  * If errors occur it should exit pipeline and do sufficient logging of the error.
  * Write little or no logging code for either path through the pipeline or error tracking.
 
+## Usage
+
+Create an Exchange:
+
+    var sqs = new AWS.SQS({region: "eu-west-1"});
+    return new SQSExchange(sqs);
+
+Register a function to move messages from somewhere, to somewhere else:
+
+    advancer(
+        // Where messages are picked up from
+        'message-into-validation', 
+
+        // Where messages go after processing
+        { "too-short": "log-bad-message", "success": "store-in-db" } 
+
+        // Where to pick up, post and delete messages from
+        memoryExchange,
+
+        // The validation function itself
+        function validateMessage(messageBody, next) {
+            if (!messageBody.hasOwnProperty('name')) { return next(null, "done", {}); }
+            if (messageBody.name.length < 5) {
+                return next(null, {name: "Teapot"});
+            }
+            next(null, {name: messageBody.name});
+        }
+
+        // After the message has been processed, this function will be called
+        function(err, details) {
+            if (err) {
+                return console.log("Something went wrong");
+            }
+            console.log(
+                "The message " + details.message + " "
+                "has been moved from " + details.fromQueue + " "
+                "to " + details.toQueue + " "
+            );
+        }
+    );
+
+Give the Queue some data:
+
+    memoryExchange.postMessageBody('validate-msg', {name: "Bob"});
+
+It will probably be that you want to continually take messages from a queue, in which case see `advancer.forever()`.
+
 ## TODO
 
- * Add more tests around _forever, see note in unit tests
- * Does `advancer._forever()` exist as an infinite loop... probably.
+ * Update MemoryExchange so it behaves like SQS (ie messages are not deleted on getMessage() but instead sleep for a configured amount of time).
