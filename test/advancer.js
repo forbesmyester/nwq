@@ -168,16 +168,24 @@ describe('advancer', function() {
         const memoryExchange = Queue.getMemory();
         var callCount = 0;
 
+        var i = 0;
+        function somethingSlow(body, next) {
+            setTimeout(function() {
+                next(null, { i: i++ });
+            }, 500);
+        }
+
         advancer.forever(
-            5,
-            'validate-msg',
-            { "success": "construct-url", "done": null },
+            3,
+            'something-slow',
+            {},
             memoryExchange,
-            validateMessage,
+            somethingSlow,
             function(result) {
-                expect(result.fromQueue).to.equal('validate-msg');
-                expect(result.toQueue).to.equal(null);
-                if (++callCount >= 3) {
+                expect(result.fromQueue).to.equal('something-slow');
+                expect(result.toQueue).to.equal('something-slow/success');
+                expect(result.message.body.i).to.be.lessThan(10);
+                if (++callCount > 9) {
                     done();
                 }
             },
@@ -186,9 +194,9 @@ describe('advancer', function() {
             }
         );
 
-        memoryExchange.postMessageBody('validate-msg', {});
-        memoryExchange.postMessageBody('validate-msg', {});
-        memoryExchange.postMessageBody('validate-msg', {});
+        memoryExchange.postMessageBody('something-slow', {});
+        memoryExchange.postMessageBody('something-slow', {});
+        memoryExchange.postMessageBody('something-slow', {});
     });
 
 });
