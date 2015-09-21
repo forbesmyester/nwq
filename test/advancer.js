@@ -128,39 +128,100 @@ describe('advancer', function() {
         memoryExchange.postMessageBody('validate-msg', {});
     });
 
-    it('has a forever function which will run n versions of a function, always', function(done) {
+    // it('can pass into multiple queues', function() {
 
-        // This needs better tests
-        //
-        //  * How do we know they are concurrent?
-        //  * We know `done()` is not called multiple times, but does it actually stop?
-        //
-        // Maybe startup notification may address these issues? Will need to think a bit more.
+    //     const memoryExchange = Queue.getMemory();
+
+    //     var askDictionaryDotCom = function(doc, next) {
+    //         setTimeout(function() {
+    //             next(null, "spelling", { "words": "supar" });
+    //         }, 120);
+    //     };
+
+    //     var saveInDb = function(doc, next) {
+    //         setTimeout(function() {
+    //             next(null, { ok: true });
+    //         }, 5);
+    //     };
+
+    //     var serviceDesc = {
+    //         "validate-msg": {
+    //             resolutions: {
+    //                 "success": ["save-in-db", "analyze-english-quality-later"]
+    //             },
+    //             handler: validateMessage
+    //         },
+    //         "save-in-db": {
+    //             resolutions: {},
+    //             handler: saveInDb
+    //         },
+    //         "analyze-english-quality-later": {
+    //             resolutions: {},
+    //             handler: askDictionaryDotCom
+    //         }
+    //     };
+
+    //     advancer(
+    //         'validate-msg',
+    //         serviceDesc['validate-msg'].resolutions,
+    //         memoryExchange,
+    //         serviceDesc['validate-msg'].handler,
+    //         function() {
+    //         }
+    //     );
+    //     advancer(
+    //         'save-in-db',
+    //         serviceDesc['save-in-db'].resolutions,
+    //         memoryExchange,
+    //         serviceDesc['save-in-db'].handler,
+    //         function() {
+    //         }
+    //     );
+    //     advancer(
+    //         'analyze-english-quality-late',
+    //         serviceDesc['analyze-english-quality-late'].resolutions,
+    //         memoryExchange,
+    //         serviceDesc['analyze-english-quality-late'].handler,
+    //         function() {
+    //         }
+    //     );
+
+    //     memoryExchange.postMessageBody('validate-msg', {});
+
+    // });
+
+    it('has a forever function which will run n versions of a function, always', function(done) {
 
         var c = 0,
             results = [];
 
         function doForever(next) {
+            c = c + 1;
+            var myC = c;
             setTimeout(function() {
-                if (c >= 5) {
-                    next(new Error(">5"));
+                if (myC > 5) {
+                    return next(new Error(">5"));
                 }
-                next(null, ++c);
-            }, 5);
+                next(null, myC);
+            }, myC * 100);
         }
 
         advancer._forever(
             doForever,
-            10,
+            3,
+            function() {
+                results.push(0);
+            },
             function(result) {
                 results.push(result);
             },
             function(err) {
                 expect(err.message).to.equal(">5");
-                expect(results).to.eql([1, 2, 3, 4, 5]);
+                expect(results).to.eql([0, 0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0]);
                 done();
             }
         );
+
     });
 
     it('will continue to advance if advancer.forever() is used', function(done) {
@@ -172,20 +233,23 @@ describe('advancer', function() {
         function somethingSlow(body, next) {
             setTimeout(function() {
                 next(null, { i: i++ });
-            }, 500);
+            }, 50);
         }
 
         advancer.forever(
-            3,
+            2,
             'something-slow',
             {},
             memoryExchange,
             somethingSlow,
+            function() {
+                // This is the begin job handler.
+            },
             function(result) {
                 expect(result.fromQueue).to.equal('something-slow');
                 expect(result.toQueue).to.equal('something-slow/success');
-                expect(result.message.body.i).to.be.lessThan(10);
-                if (++callCount > 9) {
+                expect(result.message.body.i).to.be.lessThan(3);
+                if (++callCount == 3) {
                     done();
                 }
             },
