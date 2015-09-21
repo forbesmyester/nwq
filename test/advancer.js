@@ -128,67 +128,80 @@ describe('advancer', function() {
         memoryExchange.postMessageBody('validate-msg', {});
     });
 
-    // it('can pass into multiple queues', function() {
+    it('can pass into multiple queues', function(done) {
 
-    //     const memoryExchange = Queue.getMemory();
+        const memoryExchange = Queue.getMemory();
 
-    //     var askDictionaryDotCom = function(doc, next) {
-    //         setTimeout(function() {
-    //             next(null, "spelling", { "words": "supar" });
-    //         }, 120);
-    //     };
+        var askDictionaryDotCom = function(doc, next) {
+            setTimeout(function() {
+                next(null, "spelling", { "words": "supar" });
+            }, 120);
+        };
 
-    //     var saveInDb = function(doc, next) {
-    //         setTimeout(function() {
-    //             next(null, { ok: true });
-    //         }, 5);
-    //     };
+        var saveInDb = function(doc, next) {
+            setTimeout(function() {
+                next(null, { ok: true });
+            }, 5);
+        };
 
-    //     var serviceDesc = {
-    //         "validate-msg": {
-    //             resolutions: {
-    //                 "success": ["save-in-db", "analyze-english-quality-later"]
-    //             },
-    //             handler: validateMessage
-    //         },
-    //         "save-in-db": {
-    //             resolutions: {},
-    //             handler: saveInDb
-    //         },
-    //         "analyze-english-quality-later": {
-    //             resolutions: {},
-    //             handler: askDictionaryDotCom
-    //         }
-    //     };
+        var intoQueues = [];
 
-    //     advancer(
-    //         'validate-msg',
-    //         serviceDesc['validate-msg'].resolutions,
-    //         memoryExchange,
-    //         serviceDesc['validate-msg'].handler,
-    //         function() {
-    //         }
-    //     );
-    //     advancer(
-    //         'save-in-db',
-    //         serviceDesc['save-in-db'].resolutions,
-    //         memoryExchange,
-    //         serviceDesc['save-in-db'].handler,
-    //         function() {
-    //         }
-    //     );
-    //     advancer(
-    //         'analyze-english-quality-late',
-    //         serviceDesc['analyze-english-quality-late'].resolutions,
-    //         memoryExchange,
-    //         serviceDesc['analyze-english-quality-late'].handler,
-    //         function() {
-    //         }
-    //     );
+        var goneIntoQueue = function(err, m) {
+            if (err) { return expect.fail(); }
+            intoQueues.push(m.toQueue);
+        };
 
-    //     memoryExchange.postMessageBody('validate-msg', {});
+        var serviceDesc = {
+            "validate-msg": {
+                resolutions: {
+                    "success": ["save-in-db", "analyze-english-quality-later"]
+                },
+                handler: validateMessage
+            },
+            "save-in-db": {
+                resolutions: {},
+                handler: saveInDb
+            },
+            "analyze-english-quality-later": {
+                resolutions: {},
+                handler: askDictionaryDotCom
+            }
+        };
 
-    // });
+        advancer(
+            'validate-msg',
+            serviceDesc['validate-msg'].resolutions,
+            memoryExchange,
+            serviceDesc['validate-msg'].handler,
+            goneIntoQueue
+        );
+        advancer(
+            'save-in-db',
+            serviceDesc['save-in-db'].resolutions,
+            memoryExchange,
+            serviceDesc['save-in-db'].handler,
+            goneIntoQueue
+        );
+        advancer(
+            'analyze-english-quality-later',
+            serviceDesc['analyze-english-quality-later'].resolutions,
+            memoryExchange,
+            serviceDesc['analyze-english-quality-later'].handler,
+            function(err, qs) {
+                goneIntoQueue(err, qs);
+                expect(intoQueues).to.eql([
+                    'save-in-db', // Entered second stage
+                    'analyze-english-quality-later', // Entered second stage
+                    'save-in-db/success', // save-in-db completed first
+                    'analyze-english-quality-later/spelling' // This has just completed
+                ]);
+                done();
+            }
+        );
+
+        memoryExchange.postMessageBody('validate-msg', { name: "Sir Arthur" });
+
+    });
 
     it('has a forever function which will run n versions of a function, always', function(done) {
 
