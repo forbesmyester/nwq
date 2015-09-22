@@ -10,19 +10,19 @@ describe('advancer', function() {
 
     this.timeout(20000);
 
-    function validateMessage(messageBody, next) {
-        if (!messageBody.hasOwnProperty('name')) { return next(null, "done", {}); }
-        if (messageBody.name.length < 5) {
+    function validatePayload(payload, next) {
+        if (!payload.hasOwnProperty('name')) { return next(null, "done", {}); }
+        if (payload.name.length < 5) {
             return next(null, {name: "Teapot"});
         }
-        next(null, {name: messageBody.name});
+        next(null, {name: payload.name});
     }
 
     function constructUrl({ name }, next) {
         next(null, "find-alternative", { name: "http://www.google.com?q=" + name });
     }
 
-    function doGoogleSearch(messageBody, next) {
+    function doGoogleSearch(payload, next) {
         next(500);
     }
 
@@ -42,45 +42,53 @@ describe('advancer', function() {
         // const memoryExchange = Queue.getSQS();
         const memoryExchange = Queue.getMemory();
 
-        function checkIt(err, resp) {
+        var serviceDesc = {
+            "validate-payload": {
+                resolutions: { "success": "construct-url" },
+                worker: validatePayload
+            },
+            "construct-url": {
+                resolutions: { "find-alternative": "do-google-search", "success": "download-image" },
+                worker: constructUrl
+            },
+            "do-google-search": {
+                resolutions: {},
+                worker: doGoogleSearch
+            }
+        };
+
+        var initId = null;
+
+        function checkIt(err, advResult) {
             expect(err).to.equal(null);
-            expect(resp.fromQueue).to.equal('do-google-search');
-            expect(resp.toQueue).to.equal('do-google-search/err');
-            memoryExchange.getMessage('do-google-search/err', function(err2, body) {
+            expect(advResult.fromQueue).to.equal('do-google-search');
+            expect(advResult.toQueue).to.equal('do-google-search/err');
+            expect(advResult.message.initId).to.equal(initId);
+            memoryExchange.getMessage('do-google-search/err', function(err2, message) {
                 expect(err2).to.equal(null);
-                expect(body.err).to.eql(500);
-                expect(body.path).to.eql(["validate-msg:success", "construct-url:find-alternative", "do-google-search:err"]);
-                expect(body.body).to.equal(undefined);
-                expect(body.previousBody).to.eql({name: "http://www.google.com?q=Teapot"});
-                expect(body).to.haveOwnProperty('id');
+                expect(message.err).to.eql(500);
+                expect(message.path).to.eql(["validate-payload:success", "construct-url:find-alternative", "do-google-search:err"]);
+                expect(message.payload).to.equal(undefined);
+                expect(message.previousPayload).to.eql({name: "http://www.google.com?q=Teapot"});
+                expect(message).to.haveOwnProperty('transportId');
+                expect(message.payload).to.equal(undefined);
+                expect(message.initId).to.equal(initId);
                 done();
             });
         }
 
-        var serviceDesc = {
-            "validate-msg": {
-                resolutions: { "success": "construct-url" },
-                handler: validateMessage
-            },
-            "construct-url": {
-                resolutions: { "find-alternative": "do-google-search", "success": "download-image" },
-                handler: constructUrl
-            },
-            "do-google-search": {
-                resolutions: {},
-                handler: doGoogleSearch
-            }
-        };
-
         advancer(
-            'validate-msg',
-            serviceDesc['validate-msg'].resolutions,
+            'validate-payload',
+            serviceDesc['validate-payload'].resolutions,
             memoryExchange,
-            serviceDesc['validate-msg'].handler,
-            function(err, details) {
+            serviceDesc['validate-payload'].worker,
+            function(err, advResult) {
                 expect(err).to.equal(null);
-                expect(details.fromQueue).to.equal('validate-msg');
-                expect(details.toQueue).to.equal('construct-url');
+                expect(advResult.fromQueue).to.equal('validate-payload');
+                expect(advResult.toQueue).to.equal('construct-url');
+                expect(advResult).to.haveOwnProperty('message');
+                expect(advResult.message).to.haveOwnProperty('initId');
+                initId = advResult.message.initId;
             }
         );
 
@@ -88,11 +96,12 @@ describe('advancer', function() {
             'construct-url',
             serviceDesc['construct-url'].resolutions,
             memoryExchange,
-            serviceDesc['construct-url'].handler,
-            function(err, { fromQueue, toQueue }) {
+            serviceDesc['construct-url'].worker,
+            function(err, advResult) {
                 expect(err).to.equal(null);
-                expect(fromQueue).to.equal('construct-url');
-                expect(toQueue).to.equal('do-google-search');
+                expect(advResult.fromQueue).to.equal('construct-url');
+                expect(advResult.toQueue).to.equal('do-google-search');
+                expect(advResult.message.initId).to.equal(initId);
             }
         );
 
@@ -100,11 +109,11 @@ describe('advancer', function() {
             'do-google-search',
             serviceDesc['do-google-search'].resolutions,
             memoryExchange,
-            serviceDesc['do-google-search'].handler,
+            serviceDesc['do-google-search'].worker,
             checkIt
         );
 
-        memoryExchange.postMessageBody('validate-msg', {name: "Bob"});
+        memoryExchange.postMessagePayload('validate-payload', {name: "Bob"});
 
     });
 
@@ -113,32 +122,32 @@ describe('advancer', function() {
         const memoryExchange = Queue.getMemory();
 
         advancer(
-            'validate-msg',
+            'validate-payload',
             { "success": "construct-url", "done": null },
             memoryExchange,
-            validateMessage,
-            function(err, details) {
+            validatePayload,
+            function(err, advResult) {
                 expect(err).to.equal(null);
-                expect(details.fromQueue).to.equal('validate-msg');
-                expect(details.toQueue).to.equal(null);
+                expect(advResult.fromQueue).to.equal('validate-payload');
+                expect(advResult.toQueue).to.equal(null);
                 done();
             }
         );
 
-        memoryExchange.postMessageBody('validate-msg', {});
+        memoryExchange.postMessagePayload('validate-payload', {});
     });
 
     it('can pass into multiple queues', function(done) {
 
         const memoryExchange = Queue.getMemory();
 
-        var askDictionaryDotCom = function(doc, next) {
+        var askDictionaryDotCom = function(payload, next) {
             setTimeout(function() {
                 next(null, "spelling", { "words": "supar" });
             }, 120);
         };
 
-        var saveInDb = function(doc, next) {
+        var saveInDb = function(payload, next) {
             setTimeout(function() {
                 next(null, { ok: true });
             }, 5);
@@ -146,47 +155,47 @@ describe('advancer', function() {
 
         var intoQueues = [];
 
-        var goneIntoQueue = function(err, m) {
+        var goneIntoQueue = function(err, advResult) {
             if (err) { return expect.fail(); }
-            intoQueues.push(m.toQueue);
+            intoQueues.push(advResult.toQueue);
         };
 
         var serviceDesc = {
-            "validate-msg": {
+            "validate-payload": {
                 resolutions: {
                     "success": ["save-in-db", "analyze-english-quality-later"]
                 },
-                handler: validateMessage
+                worker: validatePayload
             },
             "save-in-db": {
                 resolutions: {},
-                handler: saveInDb
+                worker: saveInDb
             },
             "analyze-english-quality-later": {
                 resolutions: {},
-                handler: askDictionaryDotCom
+                worker: askDictionaryDotCom
             }
         };
 
         advancer(
-            'validate-msg',
-            serviceDesc['validate-msg'].resolutions,
+            'validate-payload',
+            serviceDesc['validate-payload'].resolutions,
             memoryExchange,
-            serviceDesc['validate-msg'].handler,
+            serviceDesc['validate-payload'].worker,
             goneIntoQueue
         );
         advancer(
             'save-in-db',
             serviceDesc['save-in-db'].resolutions,
             memoryExchange,
-            serviceDesc['save-in-db'].handler,
+            serviceDesc['save-in-db'].worker,
             goneIntoQueue
         );
         advancer(
             'analyze-english-quality-later',
             serviceDesc['analyze-english-quality-later'].resolutions,
             memoryExchange,
-            serviceDesc['analyze-english-quality-later'].handler,
+            serviceDesc['analyze-english-quality-later'].worker,
             function(err, qs) {
                 goneIntoQueue(err, qs);
                 expect(intoQueues).to.eql([
@@ -199,7 +208,7 @@ describe('advancer', function() {
             }
         );
 
-        memoryExchange.postMessageBody('validate-msg', { name: "Sir Arthur" });
+        memoryExchange.postMessagePayload('validate-payload', { name: "Sir Arthur" });
 
     });
 
@@ -243,7 +252,7 @@ describe('advancer', function() {
         var callCount = 0;
 
         var i = 0;
-        function somethingSlow(body, next) {
+        function somethingSlow(payload, next) {
             setTimeout(function() {
                 next(null, { i: i++ });
             }, 50);
@@ -256,12 +265,12 @@ describe('advancer', function() {
             memoryExchange,
             somethingSlow,
             function() {
-                // This is the begin job handler.
+                // This is the begin job worker.
             },
-            function(result) {
-                expect(result.fromQueue).to.equal('something-slow');
-                expect(result.toQueue).to.equal('something-slow/success');
-                expect(result.message.body.i).to.be.lessThan(3);
+            function(advResult) {
+                expect(advResult.fromQueue).to.equal('something-slow');
+                expect(advResult.toQueue).to.equal('something-slow/success');
+                expect(advResult.message.payload.i).to.be.lessThan(3);
                 if (++callCount == 3) {
                     done();
                 }
@@ -271,9 +280,9 @@ describe('advancer', function() {
             }
         );
 
-        memoryExchange.postMessageBody('something-slow', {});
-        memoryExchange.postMessageBody('something-slow', {});
-        memoryExchange.postMessageBody('something-slow', {});
+        memoryExchange.postMessagePayload('something-slow', {});
+        memoryExchange.postMessagePayload('something-slow', {});
+        memoryExchange.postMessagePayload('something-slow', {});
     });
 
 });

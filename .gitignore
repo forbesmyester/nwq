@@ -1,5 +1,4 @@
 node_modules/
-js
-MemoryExchange.js
-SQSExchange.js
-advancer.js
+/MemoryExchange.js
+/SQSExchange.js
+/advancer.js
