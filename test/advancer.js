@@ -8,8 +8,6 @@ import AWS from "aws-sdk";
 
 describe('advancer', function() {
 
-    this.timeout(20000);
-
     function validatePayload(payload, next) {
         if (!payload.hasOwnProperty('name')) { return next(null, "done", {}); }
         if (payload.name.length < 5) {
