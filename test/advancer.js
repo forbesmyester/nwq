@@ -6,7 +6,9 @@ import SQSExchange from "../lib/SQSExchange";
 import advancer from "../lib/advancer";
 import AWS from "aws-sdk";
 
-describe('advancer', function() {
+describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), function() {
+
+    this.timeout(10000);
 
     function validatePayload(payload, next) {
         if (!payload.hasOwnProperty('name')) { return next(null, "done", {}); }
@@ -24,21 +26,19 @@ describe('advancer', function() {
         next(500);
     }
 
-    var Queue = {
-        getSQS: function() {
+    function getExchange() {
+        if (process.env.NWQ_TEST_SQS) {
             let sqs = new AWS.SQS({region: "eu-west-1"});
             return new SQSExchange(sqs);
-        },
-        getMemory: function() {
-            return new MemoryExchange();
         }
-    };
+        return new MemoryExchange();
+    }
 
     it('can run a queue', function(done) {
 
         // You can swap this to SQS to test that too!
         // const memoryExchange = Queue.getSQS();
-        const memoryExchange = Queue.getMemory();
+        const memoryExchange = getExchange();
 
         var serviceDesc = {
             "validate-payload": {
@@ -62,8 +62,7 @@ describe('advancer', function() {
             expect(advResult.fromQueue).to.equal('do-google-search');
             expect(advResult.toQueue).to.equal('do-google-search/err');
             expect(advResult.message.initId).to.equal(initId);
-            memoryExchange.getMessage('do-google-search/err', function(err2, message) {
-                expect(err2).to.equal(null);
+            memoryExchange.getMessage('do-google-search/err').then(function(message) {
                 expect(message.err).to.eql(500);
                 expect(message.path).to.eql(["validate-payload:success", "construct-url:find-alternative", "do-google-search:err"]);
                 expect(message.payload).to.equal(undefined);
@@ -117,7 +116,7 @@ describe('advancer', function() {
 
     it('will advance to nowhere if it advances to `null`', function(done) {
 
-        const memoryExchange = Queue.getMemory();
+        const memoryExchange = getExchange();
 
         advancer(
             'validate-payload',
@@ -137,7 +136,7 @@ describe('advancer', function() {
 
     it('can pass into multiple queues', function(done) {
 
-        const memoryExchange = Queue.getMemory();
+        const memoryExchange = getExchange();
 
         var askDictionaryDotCom = function(payload, next) {
             setTimeout(function() {
@@ -246,7 +245,7 @@ describe('advancer', function() {
 
     it('will continue to advance if advancer.forever() is used', function(done) {
 
-        const memoryExchange = Queue.getMemory();
+        const memoryExchange = getExchange();
         var callCount = 0;
 
         var i = 0;
