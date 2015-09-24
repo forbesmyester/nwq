@@ -55,7 +55,23 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
             }
         };
 
-        var initId = null;
+        var initId = null,
+            events = [];
+
+        if (!process.env.NWQ_TEST_SQS) {
+            memoryExchange.on('createQueue', () => {
+                events.push('createQueue');
+            });
+            memoryExchange.on('getMessage', () => {
+                events.push('getMessage');
+            });
+            memoryExchange.on('removeMessage', () => {
+                events.push('removeMessage');
+            });
+            memoryExchange.on('postMessage', () => {
+                events.push('postMessage');
+            });
+        }
 
         function checkIt(err, advResult) {
             expect(err).to.equal(null);
@@ -64,6 +80,9 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
             expect(advResult.message.initId).to.equal(initId);
             memoryExchange.getMessage('do-google-search/err').then(function(message) {
                 expect(message.err).to.eql(500);
+                if (!process.env.NWQ_TEST_SQS) {
+                    expect(events).to.include.members(['postMessage', 'removeMessage', 'getMessage', 'createQueue']);
+                }
                 expect(message.path).to.eql(["validate-payload:success", "construct-url:find-alternative", "do-google-search:err"]);
                 expect(message.payload).to.equal(undefined);
                 expect(message.previousPayload).to.eql({name: "http://www.google.com?q=Teapot"});
