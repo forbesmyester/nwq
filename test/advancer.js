@@ -34,11 +34,64 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
         return new MemoryExchange();
     }
 
+    it('advance, with working events', function(done) {
+
+        var exchange = getExchange(),
+            events = [];
+
+        function recordEvent(eventName) {
+            return function(processId, initId /* , queue, message */) {
+                events.push([eventName, processId, initId]);
+            };
+        }
+
+        advancer(
+            'validate-payload',
+            { "success": ["construct-url", "log-success"] },
+            exchange,
+            validatePayload,
+            {
+                onLoadingMessage: recordEvent('loadingMessage'),
+                onLoadedMessage: recordEvent('loadedMessage'),
+                onPostingResult: recordEvent('postingResult'),
+                onPostedResult: recordEvent('postedResult'),
+                onRemovingInput: recordEvent('removingInput'),
+                onRemovedInput: recordEvent('removedInput')
+            },
+            function(err, advResult) {
+                expect(err).to.equal(null);
+                expect(advResult.fromQueue).to.equal('validate-payload');
+                expect(advResult.toQueue).to.equal('construct-url');
+                expect(advResult).to.haveOwnProperty('message');
+                expect(advResult.message).to.haveOwnProperty('initId');
+                expect(events.map(function(itm) { return itm[0]; })).to.eql([
+                    'loadingMessage',
+                    'loadedMessage',
+                    'postingResult',
+                    'postingResult',
+                    'postedResult',
+                    'postedResult',
+                    'removingInput',
+                    'removedInput'
+                ]);
+                events.forEach(function(item, index) {
+                    expect(item[1]).to.eql(events[1][1]);
+                    if (index !== 0) {
+                        expect(item[2]).to.eql(events[1][2]);
+                    }
+                });
+                done();
+            }
+        );
+
+        exchange.postMessagePayload('validate-payload', {name: "Bob"});
+
+    });
+
+
     it('can run a queue', function(done) {
 
-        // You can swap this to SQS to test that too!
-        // const memoryExchange = Queue.getSQS();
-        const memoryExchange = getExchange();
+        const exchange = getExchange();
 
         var serviceDesc = {
             "validate-payload": {
@@ -59,16 +112,16 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
             events = [];
 
         if (!process.env.NWQ_TEST_SQS) {
-            memoryExchange.on('createQueue', () => {
+            exchange.on('createQueue', () => {
                 events.push('createQueue');
             });
-            memoryExchange.on('getMessage', () => {
+            exchange.on('getMessage', () => {
                 events.push('getMessage');
             });
-            memoryExchange.on('removeMessage', () => {
+            exchange.on('removeMessage', () => {
                 events.push('removeMessage');
             });
-            memoryExchange.on('postMessage', () => {
+            exchange.on('postMessage', () => {
                 events.push('postMessage');
             });
         }
@@ -78,7 +131,7 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
             expect(advResult.fromQueue).to.equal('do-google-search');
             expect(advResult.toQueue).to.equal('do-google-search/err');
             expect(advResult.message.initId).to.equal(initId);
-            memoryExchange.getMessage('do-google-search/err').then(function(message) {
+            exchange.getMessage('do-google-search/err').then(function(message) {
                 expect(message.err).to.eql(500);
                 if (!process.env.NWQ_TEST_SQS) {
                     expect(events).to.include.members(['postMessage', 'removeMessage', 'getMessage', 'createQueue']);
@@ -96,8 +149,9 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
         advancer(
             'validate-payload',
             serviceDesc['validate-payload'].resolutions,
-            memoryExchange,
+            exchange,
             serviceDesc['validate-payload'].worker,
+            {},
             function(err, advResult) {
                 expect(err).to.equal(null);
                 expect(advResult.fromQueue).to.equal('validate-payload');
@@ -111,8 +165,9 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
         advancer(
             'construct-url',
             serviceDesc['construct-url'].resolutions,
-            memoryExchange,
+            exchange,
             serviceDesc['construct-url'].worker,
+            {},
             function(err, advResult) {
                 expect(err).to.equal(null);
                 expect(advResult.fromQueue).to.equal('construct-url');
@@ -124,24 +179,26 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
         advancer(
             'do-google-search',
             serviceDesc['do-google-search'].resolutions,
-            memoryExchange,
+            exchange,
             serviceDesc['do-google-search'].worker,
+            {},
             checkIt
         );
 
-        memoryExchange.postMessagePayload('validate-payload', {name: "Bob"});
+        exchange.postMessagePayload('validate-payload', {name: "Bob"});
 
     });
 
     it('will advance to nowhere if it advances to `null`', function(done) {
 
-        const memoryExchange = getExchange();
+        const exchange = getExchange();
 
         advancer(
             'validate-payload',
             { "success": "construct-url", "done": null },
-            memoryExchange,
+            exchange,
             validatePayload,
+            {},
             function(err, advResult) {
                 expect(err).to.equal(null);
                 expect(advResult.fromQueue).to.equal('validate-payload');
@@ -150,12 +207,12 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
             }
         );
 
-        memoryExchange.postMessagePayload('validate-payload', {});
+        exchange.postMessagePayload('validate-payload', {});
     });
 
     it('can pass into multiple queues', function(done) {
 
-        const memoryExchange = getExchange();
+        const exchange = getExchange();
 
         var askDictionaryDotCom = function(payload, next) {
             setTimeout(function() {
@@ -196,22 +253,25 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
         advancer(
             'validate-payload',
             serviceDesc['validate-payload'].resolutions,
-            memoryExchange,
+            exchange,
             serviceDesc['validate-payload'].worker,
+            {},
             goneIntoQueue
         );
         advancer(
             'save-in-db',
             serviceDesc['save-in-db'].resolutions,
-            memoryExchange,
+            exchange,
             serviceDesc['save-in-db'].worker,
+            {},
             goneIntoQueue
         );
         advancer(
             'analyze-english-quality-later',
             serviceDesc['analyze-english-quality-later'].resolutions,
-            memoryExchange,
+            exchange,
             serviceDesc['analyze-english-quality-later'].worker,
+            {},
             function(err, qs) {
                 goneIntoQueue(err, qs);
                 expect(intoQueues).to.eql([
@@ -224,7 +284,7 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
             }
         );
 
-        memoryExchange.postMessagePayload('validate-payload', { name: "Sir Arthur" });
+        exchange.postMessagePayload('validate-payload', { name: "Sir Arthur" });
 
     });
 
@@ -264,7 +324,7 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
 
     it('will continue to advance if advancer.forever() is used', function(done) {
 
-        const memoryExchange = getExchange();
+        const exchange = getExchange();
         var callCount = 0;
 
         var i = 0;
@@ -278,11 +338,10 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
             2,
             'something-slow',
             {},
-            memoryExchange,
+            exchange,
             somethingSlow,
-            function() {
-                // This is the begin job worker.
-            },
+            {},
+            function() { }, // This is the begin job worker.
             function(advResult) {
                 expect(advResult.fromQueue).to.equal('something-slow');
                 expect(advResult.toQueue).to.equal('something-slow/success');
@@ -296,9 +355,9 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
             }
         );
 
-        memoryExchange.postMessagePayload('something-slow', {});
-        memoryExchange.postMessagePayload('something-slow', {});
-        memoryExchange.postMessagePayload('something-slow', {});
+        exchange.postMessagePayload('something-slow', {});
+        exchange.postMessagePayload('something-slow', {});
+        exchange.postMessagePayload('something-slow', {});
     });
 
 });
