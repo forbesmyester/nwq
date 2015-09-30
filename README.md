@@ -34,44 +34,84 @@ My aims where as follows:
 
 Create an Exchange:
 
+```javascript
     var sqs = new AWS.SQS({region: "eu-west-1"});
-    return new SQSExchange(sqs);
+    var exchange = new SQSExchange(sqs);
+```
 
 Register a function to move messages from somewhere, to somewhere else:
 
-    advancer(
-        // Where messages are picked up from
-        'validate-input',
 
-        // Where messages go after processing
-        { "too-short": "log-bad-message", "success": "store-in-db" }
+```javascript
+    var adv = new Advancer(exchange);
 
-        // Where to pick up, post and delete messages from
-        memoryExchange,
+    // Check the spelling of an individual word in the dicitonary
+    function checkWord(word) {
+        return fetch('http://some-restful-dictionary.com/word/car')
+            .then(function(response) {
+                return (response.status == 200);
+            });
+    }
 
-        // The validation function itself
-        function validateInput(payload, next) {
-            if (!payload.hasOwnProperty('name') || payload.name.length < 5) {
-                return next(null, "log-bad-message", payload);
+    adv.addSpecification(
+        'spellcheck',
+        { "success": ["pick-prominent-words"] },
+        function({haiku}) {
+
+            function checkSpellingResults(wordsSpeltCorrect) {
+
+                // Once we have all the results, check there are no incorrect
+                // spelt words (we should ideally have an array of true).
+                //
+                // The result of this is that the message will be placed into
+                // the "pick_prominent_words" queue as it is defined as the
+                // success condition above.
+                if (wordsSpeltCorrect.indexOf(false) === -1) {
+                    return {
+                        resolution: 'success',
+                        payload: haiku
+                    }
+                }
+
+                // If we have some falses, then we set a resolution to
+                // "spelling-error". We did not tell it where to send
+                // this resolution so it will go into the (and create if
+                // neccessary) "spellcheck/spelling-error" queue.
+                return {
+                    resolution: 'spelling-error',
+                    payload: haiku
+                }
             }
-            next(null, {name: payload.name}); // two parameters implies success
-        }
 
-        // After the message has been processed, this function will be called
-        function(err, advResult) {
-            if (err) {
-                return console.log("Something went wrong");
-            }
-            console.log(
-                "The message " + advResult.message + " "
-                "has been moved from " + advResult.fromQueue + " "
-                "to " + advResult.toQueue + " "
-            );
+            // Break into words and send all of them for spellchecking
+            return Promise.all(haiku.split(/\s+/).map(checkWord))
+                .then(checkSpellingResults);
         }
     );
 
+    adv.run('spellcheck')
+        .then(function(advResult) {
+            console.log(
+                "Message " + JSON.stringify(advResult.srcMessage) + " " +
+                "taken from " + advResult.srcQueue +
+                " queue.\n\n" +
+                "It was processed, " +
+                "became " + JSON.stringify(advResult.srcMessage) + " "
+                and placed in the " + advResult.dstQueues.join(", ") + " " +
+                "queues.\n\n"
+            );
+        });
+```
+
+
 Give the Queue some data:
 
-    memoryExchange.postMessageBody('validate-input', {name: "Bob"});
+```javascript
+    exchange.postMessagePayload(
+        'spellcheck',
+        {haiku: "Black and orange stripes\n" +
+            "Sneaking quietly through grass\n" +
+            "Claws pointy and sharp"});
+```
 
-It will probably be that you want to continually take messages from a queue, in which case see `advancer.forever()`.
+It will probably be that you want to continually take messages from a queue, in which case see `advancer.runForever()`.
