@@ -1,6 +1,6 @@
 {
   "name": "nwq",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Base Node ES6 Project",
   "scripts": {
     "test": "node_modules/.bin/eslint test/*.js lib/*.js && mocha --compilers js:babel/register",
@@ -24,7 +24,8 @@
   "homepage": "https://github.com/forbesmyester/nwq",
   "dependencies": {
     "aws-sdk": "^2.2.3",
-    "get_tlid_encoder_decoder": "^0.9.4"
+    "get_tlid_encoder_decoder": "^0.9.4",
+    "ramda": "^0.17.1"
   },
   "devDependencies": {
     "babel": "^5.6.4",
