@@ -97,7 +97,7 @@ Register a function to move messages from somewhere, to somewhere else:
                 " queue.\n\n" +
                 "It was processed, " +
                 "became " + JSON.stringify(advResult.srcMessage) + " "
-                and placed in the " + advResult.dstQueues.join(", ") + " " +
+                "and placed in the " + advResult.dstQueues.join(", ") + " " +
                 "queues.\n\n"
             );
         });
