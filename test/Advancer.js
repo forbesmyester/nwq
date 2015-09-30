@@ -54,32 +54,52 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
 
     });
 
-    it('can do promises (also destination string, instead of array)', function(done) {
+    it('can do promises, multiple stages and check destination strings also work', function(done) {
 
         var exchange = getExchange(),
-            adv = new Advancer(exchange);
+            adv = new Advancer(exchange),
+            initId;
 
         adv.addSpecification(
             'validate-payload',
-            { "success": "log-success" },
-            function() {
+            { "success": "process" },
+            function({score}) {
                 return new Promise((resolve) => {
-                    resolve({message: 'hello'});
+                    resolve({ score: score + 1 });
+                });
+            }
+        );
+
+        adv.addSpecification(
+            'process',
+            {},
+            function({score}) {
+                return new Promise((resolve) => {
+                    resolve({ score: score + 10 });
                 });
             }
         );
 
         adv.run('validate-payload')
             .then(function(advResult) {
+                initId = advResult.newMessage.initId;
                 expect(advResult.srcQueue).to.equal('validate-payload');
                 expect(advResult.dstQueues).to.eql(["log-success"]);
                 expect(advResult.newMessage).to.haveOwnProperty('payload');
-                expect(advResult.newMessage.payload).to.eql({message: 'hello'});
+                expect(advResult.newMessage.payload).to.eql({score: 2});
                 expect(advResult.newMessage).to.haveOwnProperty('initId');
+            });
+
+        adv.run('process')
+            .then(function(advResult) {
+                expect(advResult.srcQueue).to.equal('process');
+                expect(advResult.dstQueues).to.eql(["process/success"]);
+                expect(advResult.newMessage.payload).to.eql({score: 12});
+                expect(advResult.newMessage.initId).to.eql(initId);
                 done();
             });
 
-        exchange.postMessagePayload('validate-payload', {name: "Bob"});
+        exchange.postMessagePayload('validate-payload', {score: 1});
 
     });
 
