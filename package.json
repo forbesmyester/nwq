@@ -1,14 +1,14 @@
 {
   "name": "nwq",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "description": "Base Node ES6 Project",
   "scripts": {
     "test": "node_modules/.bin/eslint test/*.js lib/*.js && mocha --compilers js:babel/register",
     "pretest": "echo '#!/bin/bash\nnpm test' >  .git/hooks/pre-commit && chmod +x  .git/hooks/pre-commit",
-    "prepublish": "node_modules/.bin/babel lib/advancer.js > advancer.js && node_modules/.bin/babel lib/SQSExchange.js > SQSExchange.js && node_modules/.bin/babel lib/MemoryExchange.js > MemoryExchange.js"
+    "prepublish": "node_modules/.bin/babel lib/Advancer.js > Advancer.js && node_modules/.bin/babel lib/SQSExchange.js > SQSExchange.js && node_modules/.bin/babel lib/MemoryExchange.js > MemoryExchange.js"
   },
   "files": [
-    "advancer.js",
+    "Advancer.js",
     "MemoryExchange.js",
     "SQSExchange.js"
   ],
