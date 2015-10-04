@@ -282,4 +282,182 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
 
     });
 
+    describe('can process worker results', function() {
+        var exchange = getExchange(),
+            adv = new Advancer(exchange),
+            desiredResult = {
+                resolution: "success",
+                payload: { greet: "Hello Andrew" }
+            };
+
+        it('is a promiseNone', function(done) {
+            function promiseNone(payload) {
+                return new Promise((resolve) => {
+                    resolve({ greet: "Hello " + payload.name });
+                });
+            }
+            adv.addSpecification('promiseNone', {"success": "success"}, promiseNone);
+            adv._callWorker('promiseNone', { name: "Andrew" }).then((wr) => {
+                expect(wr).to.eql(desiredResult);
+                done();
+            }).catch(done);
+        });
+
+        it('is a promiseSimple', function(done) {
+            function promiseSimple(payload) {
+                return new Promise((resolve) => {
+                    resolve({ _resolution: 'success', greet: "Hello " + payload.name });
+                });
+            }
+            adv.addSpecification('promiseSimple', {"success": "success"}, promiseSimple);
+            adv._callWorker('promiseSimple', { name: "Andrew" }).then((wr) => {
+                expect(wr).to.eql(desiredResult);
+                done();
+            }).catch(done);
+        });
+
+        it('is a promiseFull', function(done) {
+            function promiseFull(payload) {
+                return new Promise((resolve) => {
+                    resolve({ resolution: 'success', payload: { greet: "Hello " + payload.name } });
+                });
+            }
+            adv.addSpecification('promiseFull', {"success": "success"}, promiseFull);
+            adv._callWorker('promiseFull', { name: "Andrew" }).then((wr) => {
+                expect(wr).to.eql(desiredResult);
+                done();
+            }).catch(done);
+        });
+
+        it('is a asReturnFull', function(done) {
+            function asReturnFull(payload) {
+                return { resolution: 'success', payload: { greet: "Hello " + payload.name } };
+            }
+            adv.addSpecification('asReturnFull', {"success": "success"}, asReturnFull);
+            adv._callWorker('asReturnFull', { name: "Andrew" }).then((wr) => {
+                expect(wr).to.eql(desiredResult);
+                done();
+            }).catch(done);
+        });
+
+        it('is a asReturnSimple', function(done) {
+            function asReturnSimple(payload) {
+                return { _resolution: 'success', greet: "Hello " + payload.name };
+            }
+            adv.addSpecification('asReturnSimple', {"success": "success"}, asReturnSimple);
+            adv._callWorker('asReturnSimple', { name: "Andrew" }).then((wr) => {
+                expect(wr).to.eql(desiredResult);
+                done();
+            }).catch(done);
+        });
+
+        it('is a callbackNone', function(done) {
+            function callbackNone(payload, next) {
+                next(null, { greet: "Hello " + payload.name });
+            }
+            adv.addSpecification('callbackNone', {"success": "success"}, callbackNone);
+            adv._callWorker('callbackNone', { name: "Andrew" }).then((wr) => {
+                expect(wr).to.eql(desiredResult);
+                done();
+            }).catch(done);
+        });
+
+        it('is a callbackLikePromiseSimple', function(done) {
+            function callbackLikePromiseSimple(payload, next) {
+                next(null, { _resolution: "success", greet: "Hello " + payload.name });
+            }
+            adv.addSpecification('callbackLikePromiseSimple', {"success": "success"}, callbackLikePromiseSimple);
+            adv._callWorker('callbackLikePromiseSimple', { name: "Andrew" }).then((wr) => {
+                expect(wr).to.eql(desiredResult);
+                done();
+            }).catch(done);
+        });
+
+        it('is a callbackLikePromiseFull', function(done) {
+            function callbackLikePromiseFull(payload, next) {
+                next(null, { resolution: "success", payload: { greet: "Hello " + payload.name } });
+            }
+            adv.addSpecification('callbackLikePromiseFull', {"success": "success"}, callbackLikePromiseFull);
+            adv._callWorker('callbackLikePromiseFull', { name: "Andrew" }).then((wr) => {
+                expect(wr).to.eql(desiredResult);
+                done();
+            }).catch(done);
+        });
+
+        it('is a callbackFull', function(done) {
+            function callbackFull(payload, next) {
+                next(null, "success", { greet: "Hello " + payload.name });
+            }
+            adv.addSpecification('callbackFull', {"success": "success"}, callbackFull);
+            adv._callWorker('callbackFull', { name: "Andrew" }).then((wr) => {
+                expect(wr).to.eql(desiredResult);
+                done();
+            });
+        });
+
+    });
+
+    it('can traverse', function(done) {
+
+        var exchange = getExchange(),
+            adv = new Advancer(exchange);
+
+        adv.addSpecification(
+            'validate-payload',
+            { "success": ["construct-url"] },
+            validatePayload
+        );
+
+        adv.addSpecification(
+            'construct-url',
+            { "success": ["do-request"] },
+            function(payload) {
+                return {
+                    _resolution: 'success',
+                    url: 'http://greeter.com/hello/' + payload.name
+                };
+            }
+        );
+
+        adv.addSpecification(
+            'do-request',
+            { "success": ["add-to-database"] },
+            function(payload) {
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        resolve({ greeting: "Hello " + payload.url.replace(/.*\//, '') });
+                    }, 89);
+                });
+            }
+        );
+
+        // adv.on('loadingMessage', console.log.bind(this, 'loadingMessage'));
+        // adv.on('loadedMessage', console.log.bind(this, 'loadedMessage'));
+        // adv.on('postingResult', console.log.bind(this, 'postingResult'));
+        // adv.on('postedResult', console.log.bind(this, 'postedResult'));
+        // adv.on('removingInput', console.log.bind(this, 'removingInput'));
+        // adv.on('removedInput', console.log.bind(this, 'removedInput'));
+
+        adv.run('validate-payload').then(function(advResult) {
+            expect(advResult.srcQueue).to.eql('validate-payload');
+            expect(advResult.dstQueues).to.eql(["construct-url"]);
+        }).catch(done);
+
+        adv.run('construct-url').then(function(advResult) {
+            expect(advResult.srcQueue).to.eql('construct-url');
+            expect(advResult.dstQueues).to.eql(["do-request"]);
+        }).catch(done);
+
+        adv.run('do-request').then(function(advResult) {
+            expect(advResult.srcQueue).to.eql('do-request');
+            expect(advResult.dstQueues).to.eql(["add-to-database"]);
+            done();
+        }).catch(done);
+
+
+        exchange.postMessagePayload('validate-payload', {name: 'Robert'})
+            .catch(done);
+
+    });
+
 });

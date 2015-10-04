@@ -1,6 +1,6 @@
 {
   "name": "nwq",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "description": "Base Node ES6 Project",
   "scripts": {
     "test": "node_modules/.bin/eslint test/*.js lib/*.js && mocha --compilers js:babel/register",
