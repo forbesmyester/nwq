@@ -27,16 +27,15 @@ describe('can build the correct overall field structure', function() {
 
 
     it('does', function() {
-        var v = new Visualize();
+        var v = new Visualize({ on: function() {} });
         v._loadingMessage('a', 'q1', {});
-        expect(v._getGraphData()).to.eql({ q1: {} });
+        expect(v._getGraph()).to.eql({ q1: {} });
         v._loadedMessage('a', 'q1', { initId: 'xyz' });
-        expect(v._getGraphData()).to.eql({ q1: {} });
+        expect(v._getGraph()).to.eql({ q1: {} });
         v._postingResult('a', 'q2', { initId: 'xyz', path: ['a:success'] });
-        expect(v._getGraphData()).to.eql({
-            q1: { success: ['q2'] },
+        expect(v._getGraph()).to.eql({
+            q1: { success: { links: [ { target: 'q2._' } ] } },
             q2: {}
         });
     });
 });
-
