@@ -5,7 +5,7 @@
   "scripts": {
     "test": "node_modules/.bin/eslint test/*.js lib/*.js && mocha --compilers js:babel/register",
     "pretest": "echo '#!/bin/bash\nnpm test' >  .git/hooks/pre-commit && chmod +x  .git/hooks/pre-commit",
-    "prepublish": "node_modules/.bin/babel lib/Advancer.js > Advancer.js && node_modules/.bin/babel lib/SQSExchange.js > SQSExchange.js && node_modules/.bin/babel lib/MemoryExchange.js > MemoryExchange.js"
+    "prepublish": "node_modules/.bin/babel lib/Advancer.js > Advancer.js && node_modules/.bin/babel lib/SQSExchange.js > SQSExchange.js && node_modules/.bin/babel lib/Visualize.js > Visualize.js && node_modules/.bin/babel lib/MemoryExchange.js > MemoryExchange.js"
   },
   "files": [
     "Advancer.js",
