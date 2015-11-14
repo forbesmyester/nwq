@@ -1,6 +1,6 @@
 {
   "name": "nwq",
-  "version": "0.5.11",
+  "version": "0.5.12",
   "description": "A micro framework for working with queue services.",
   "scripts": {
     "test": "node_modules/.bin/eslint test/*.js lib/*.js && mocha --compilers js:babel/register",

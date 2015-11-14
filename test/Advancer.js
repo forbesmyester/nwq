@@ -161,7 +161,7 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
             events = [];
 
         function recordEvent(eventName) {
-            return function(processId, initId /* , queue, message */) {
+            return function(processId, initId /* , fromQueue, toQueue, message */) {
                 events.push([eventName, processId, initId]);
             };
         }
@@ -430,13 +430,6 @@ describe('advancer with ' + (process.env.NWQ_TEST_SQS ? 'SQS' : 'Memory'), funct
                 });
             }
         );
-
-        // adv.on('loadingMessage', console.log.bind(this, 'loadingMessage'));
-        // adv.on('loadedMessage', console.log.bind(this, 'loadedMessage'));
-        // adv.on('postingResult', console.log.bind(this, 'postingResult'));
-        // adv.on('postedResult', console.log.bind(this, 'postedResult'));
-        // adv.on('removingInput', console.log.bind(this, 'removingInput'));
-        // adv.on('removedInput', console.log.bind(this, 'removedInput'));
 
         adv.run('validate-payload').then(function(advResult) {
             expect(advResult.srcQueue).to.eql('validate-payload');
