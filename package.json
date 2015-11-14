@@ -1,13 +1,14 @@
 {
   "name": "nwq",
-  "version": "0.5.8",
-  "description": "Base Node ES6 Project",
+  "version": "0.5.11",
+  "description": "A micro framework for working with queue services.",
   "scripts": {
     "test": "node_modules/.bin/eslint test/*.js lib/*.js && mocha --compilers js:babel/register",
     "pretest": "echo '#!/bin/bash\nnpm test' >  .git/hooks/pre-commit && chmod +x  .git/hooks/pre-commit",
     "prepublish": "node_modules/.bin/babel lib/Advancer.js > Advancer.js && node_modules/.bin/babel lib/SQSExchange.js > SQSExchange.js && node_modules/.bin/babel lib/Visualize.js > Visualize.js && node_modules/.bin/babel lib/MemoryExchange.js > MemoryExchange.js"
   },
   "files": [
+    "Visualize.js",
     "Advancer.js",
     "MemoryExchange.js",
     "SQSExchange.js"
@@ -33,7 +34,6 @@
     "babel-loader": "^5.1.4",
     "chai": "^3.2.0",
     "eslint": "^0.24.0",
-    "expect.js": "^0.3.1",
     "mocha": "^2.2.5"
   }
 }

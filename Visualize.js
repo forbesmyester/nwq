@@ -48,10 +48,6 @@ var _ramdaSrcAssocPath = require('ramda/src/assocPath');
 
 var _ramdaSrcAssocPath2 = _interopRequireDefault(_ramdaSrcAssocPath);
 
-var _ramdaSrcInc = require('ramda/src/inc');
-
-var _ramdaSrcInc2 = _interopRequireDefault(_ramdaSrcInc);
-
 var _ramdaSrcPath = require('ramda/src/path');
 
 var _ramdaSrcPath2 = _interopRequireDefault(_ramdaSrcPath);
@@ -82,8 +78,8 @@ var Visualize = (function (_EventEmitter) {
 
         _get(Object.getPrototypeOf(Visualize.prototype), 'constructor', this).call(this);
         this._qr = {};
-        this._loaded = {};
         this._active = null;
+        this._ids = [];
 
         advancer.on('loadingMessage', this._loadingMessage.bind(this));
         advancer.on('loadedMessage', this._loadedMessage.bind(this));
@@ -95,27 +91,25 @@ var Visualize = (function (_EventEmitter) {
 
     _createClass(Visualize, [{
         key: '_reprocessLoaded',
-        value: function _reprocessLoaded() {
-            var _this = this;
+        value: function _reprocessLoaded(_ref) {
+            var _ref2 = _slicedToArray(_ref, 4);
 
-            (0, _ramdaSrcMapObj2['default'])(function (_ref) {
-                var _ref2 = _slicedToArray(_ref, 4);
+            var queue = _ref2[0];
+            var resolution = _ref2[1];
+            var destination = _ref2[2];
+            var message = _ref2[3];
 
-                var queue = _ref2[0];
-                var resolution = _ref2[1];
-                var destinations = _ref2[2];
-                var message = _ref2[3];
+            var destinations = (0, _ramdaSrcConcat2['default'])((0, _ramdaSrcDefaultTo2['default'])([], (0, _ramdaSrcPath2['default'])([queue, resolution, 'destinations'], this._qr)), [destination]);
 
-                _this._qr = (0, _ramdaSrcAssocPath2['default'])([queue, resolution], {
-                    destinations: (0, _ramdaSrcKeys2['default'])(destinations),
-                    message: message
-                }, _this._qr);
-            }, this._loaded);
+            this._qr = (0, _ramdaSrcAssocPath2['default'])([queue, resolution], {
+                destinations: destinations,
+                message: message
+            }, this._qr);
         }
     }, {
         key: '_addQueue',
         value: function _addQueue(queue) {
-            this._qr = (0, _ramdaSrcAssoc2['default'])(queue, (0, _ramdaSrcDefaultTo2['default'])([], this._qr[queue]), this._qr);
+            this._qr = (0, _ramdaSrcAssoc2['default'])(queue, (0, _ramdaSrcDefaultTo2['default'])({}, this._qr[queue]), this._qr);
         }
     }, {
         key: '_loadingMessage',
@@ -134,10 +128,8 @@ var Visualize = (function (_EventEmitter) {
             this._active = ['i', message.initId];
             var resolution = this._getResolution(message);
             this._addQueue(queue, resolution);
-            this._loaded[message.initId][1] = resolution;
-            this._loaded[message.initId][2][queue] = (0, _ramdaSrcInc2['default'])((0, _ramdaSrcDefaultTo2['default'])(0, this._loaded[message.initId][2][queue]));
-            this._loaded[message.initId][3] = message;
-            this._reprocessLoaded();
+            var loaded = [(0, _ramdaSrcLast2['default'])(message.path).replace(/\:[^\:].*/, ''), resolution, queue, message];
+            this._reprocessLoaded(loaded);
             this.emit('need-redraw', this._getGraph());
         }
     }, {
@@ -145,7 +137,6 @@ var Visualize = (function (_EventEmitter) {
         value: function _loadedMessage(processId, queue, message) {
             this._active = ['i', message.initId];
             this._addQueue(queue);
-            this._loaded[message.initId] = [queue, null, {}];
             this.emit('need-redraw', this._getGraph());
         }
     }, {
@@ -200,7 +191,8 @@ var Visualize = (function (_EventEmitter) {
         key: '_getGraph',
         value: function _getGraph() {
 
-            var graphData = this._qr;
+            var graphData = this._qr,
+                that = this;
 
             // in the form [key, [array_of_subkey]]
             var keysAndSubkeys = (0, _ramdaSrcValues2['default'])((0, _ramdaSrcMapObjIndexed2['default'])(function (v, k) {
@@ -223,13 +215,11 @@ var Visualize = (function (_EventEmitter) {
             // data forwarded onto anywhere
             function buildBase(gd) {
                 return (0, _ramdaSrcReduce2['default'])(function (acc, k) {
-                    return (0, _ramdaSrcAssocPath2['default'])([k], {}, acc);
+                    return (0, _ramdaSrcAssocPath2['default'])([k], { _: null }, acc);
                 }, {}, (0, _ramdaSrcKeys2['default'])(gd));
             }
 
-            return (0, _ramdaSrcReduce2['default'])(function (acc, gdPath) {
-                var _this2 = this;
-
+            var graphResult = (0, _ramdaSrcReduce2['default'])(function (acc, gdPath) {
                 // a list of queues that the data went to
                 var gdLinks = (0, _ramdaSrcDefaultTo2['default'])([], (0, _ramdaSrcPath2['default'])((0, _ramdaSrcConcat2['default'])(gdPath, ['destinations']), graphData));
 
@@ -237,10 +227,12 @@ var Visualize = (function (_EventEmitter) {
 
                 // the { target: table.field } pattern from db-diayaml
                 var newLinks = (0, _ramdaSrcMap2['default'])(function (item) {
-                    var r = { diaprops: {
-                            id: _this2._refer((0, _ramdaSrcConcat2['default'])(gdPath, [item]), lastMessage)
-                        } };
-                    if (lastMessage.initId === _this2._active[1]) {
+                    var r = {
+                        diaprops: {
+                            id: that._refer((0, _ramdaSrcConcat2['default'])(gdPath, [item]), lastMessage)
+                        }
+                    };
+                    if (lastMessage.initId === that._active[1]) {
                         r.diaprops.color = 'red';
                         r.diaprops.style = 'dashed';
                     }
@@ -251,6 +243,8 @@ var Visualize = (function (_EventEmitter) {
                 // put it into the links
                 return (0, _ramdaSrcAssocPath2['default'])((0, _ramdaSrcConcat2['default'])(gdPath, ['links']), newLinks, acc);
             }, buildBase(graphData), paths);
+
+            return graphResult;
         }
     }]);
 
