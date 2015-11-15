@@ -59,8 +59,8 @@ var Visualize = (function (_EventEmitter) {
         key: '_addQueue',
         value: function _addQueue() /* queue, resolution */{
             // Resolution may not be passed...
-            var path = Array.prototype.slice.call(arguments, 0);
-            this._qr = (0, _ramda.assocPath)(path, (0, _ramda.defaultTo)({}, path(path, this._qr)), this._qr);
+            var p = Array.prototype.slice.call(arguments, 0);
+            this._qr = (0, _ramda.assocPath)(p, (0, _ramda.defaultTo)({}, (0, _ramda.path)(p, this._qr)), this._qr);
         }
     }, {
         key: '_loadingMessage',
