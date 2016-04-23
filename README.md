@@ -35,83 +35,79 @@ My aims where as follows:
 Create an Exchange:
 
 ```javascript
-    var sqs = new AWS.SQS({region: "eu-west-1"});
-    var exchange = new SQSExchange(sqs);
+var AWS = require('aws-sdk');
+var SQSExchange require("nwq/SQSExchange)";
+
+var sqs = new AWS.SQS({region: "eu-west-1"});
+var exchange = new SQSExchange(sqs);
 ```
 
-Register a function to move messages from somewhere, to somewhere else:
-
+Construct an Advancer
 
 ```javascript
-    var adv = new Advancer(exchange);
+var Advancer = require("./lib/Advancer");
 
-    // Check the spelling of an individual word in the dicitonary
-    function checkWord(word) {
-        return fetch('http://some-restful-dictionary.com/word/car')
-            .then(function(response) {
-                return (response.status == 200);
-            });
-    }
+var adv = new Advancer(exchange);
+```
 
-    adv.addSpecification(
-        'spellcheck',
-        { "success": ["pick-prominent-words"] },
-        function({haiku}) {
+Construct a handler for messages, which is returns a promise, or takes a callback.
 
-            function checkSpellingResults(wordsSpeltCorrect) {
+```javascript
+var fetch require("node-fetch");
+var querystring = require('querystring');
 
-                // Once we have all the results, check there are no incorrect
-                // spelt words (we should ideally have an array of true).
-                //
-                // The result of this is that the message will be placed into
-                // the "pick_prominent_words" queue as it is defined as the
-                // success condition above.
-                if (wordsSpeltCorrect.indexOf(false) === -1) {
-                    return {
-                        resolution: 'success',
-                        payload: haiku
-                    }
-                }
+// Check the spelling of an individual word in the dicitonary
+function checkWord(word) {
 
-                // If we have some falses, then we set a resolution to
-                // "spelling-error". We did not tell it where to send
-                // this resolution so it will go into the (and create if
-                // neccessary) "spellcheck/spelling-error" queue.
-                return {
-                    resolution: 'spelling-error',
-                    payload: haiku
-                }
-            }
+    let baseUrl = 'https://api.pearson.com:443/v2/dictionaries/ldoce5/entries',
+        params = { headword: word },
+        url = baseUrl + '?' + querystring.stringify(params);
 
-            // Break into words and send all of them for spellchecking
-            return Promise.all(haiku.split(/\s+/).map(checkWord))
-                .then(checkSpellingResults);
-        }
-    );
-
-    adv.run('spellcheck')
-        .then(function(advResult) {
-            console.log(
-                "Message " + JSON.stringify(advResult.srcMessage) + " " +
-                "taken from " + advResult.srcQueue +
-                " queue.\n\n" +
-                "It was processed, " +
-                "became " + JSON.stringify(advResult.srcMessage) + " "
-                "and placed in the " + advResult.dstQueues.join(", ") + " " +
-                "queues.\n\n"
-            );
+    return fetch(url)
+        .then(function(response) {
+            return {
+                resolution: (response.status == 200) ? 'found' : 'missing',
+                payload: word
+            };
         });
+}
+```
+
+Register the handler.
+
+```javascript
+adv.addSpecification(
+    'spellcheck',
+    { "found": ["word-is-correct"], "missing": ["word-is-correct"] },
+    checkWord
+);
+```
+
+Wait for a message.
+
+```javascript
+adv.run('spellcheck')
+    .then(function(advResult) {
+        console.log(
+            "Message " + JSON.stringify(advResult.srcMessage) + " " +
+            "taken from " + advResult.srcQueue +
+            " queue.\n\n" +
+            "It was processed, " +
+            "became " + JSON.stringify(advResult.srcMessage) + " " +
+            "and placed in the " + advResult.dstQueues.join(", ") + " " +
+            "queues.\n\n"
+        );
+    });
 ```
 
 
 Give the Queue some data:
 
 ```javascript
-    exchange.postMessagePayload(
-        'spellcheck',
-        {haiku: "Black and orange stripes\n" +
-            "Sneaking quietly through grass\n" +
-            "Claws pointy and sharp"});
+exchange.postMessagePayload(
+    'spellcheck',
+    "hello"
+);
 ```
 
 It will probably be that you want to continually take messages from a queue, in which case see `advancer.runForever()`.
