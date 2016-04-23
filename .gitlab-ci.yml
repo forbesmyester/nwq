@@ -1,0 +1,9 @@
+before_script:
+  - wget -O /tmp/n.tar.xz https://nodejs.org/dist/v4.4.3/node-v4.4.3-linux-x64.tar.xz
+  - tar -C /tmp -xf /tmp/n.tar.xz
+  - mv /tmp/node-v* /tmp/node
+  - PATH=$PATH:/tmp/node/bin npm install
+
+test:
+  script:
+    - PATH=$PATH:/tmp/node/bin npm test

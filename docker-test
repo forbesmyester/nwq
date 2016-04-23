@@ -1,0 +1,11 @@
+#!/bin/bash
+DOCKER_TAG=$(echo $PWD | tr '[:upper:]' '[:lower:]' | sed 's/^\///' | sed 's/\//-/g')
+echo ""
+echo "== USING DOCKER TAG: test-$DOCKER_TAG =========================="
+echo ""
+DOCKERFILE="./Dockerfile.docker-test"
+if [ "$#" -gt 0 ] ; then
+    echo "HERE"
+    DOCKERFILE=$1
+fi
+docker build -t "test-${DOCKER_TAG}" -f $DOCKERFILE  . && docker run "test-${DOCKER_TAG}"
